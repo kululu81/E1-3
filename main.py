@@ -156,6 +156,46 @@ def normalize_label(label):
     return None
 
 
+def normalize_filter_keys(filter_info):
+    """필터 딕셔너리의 키를 cross 또는 x로 통일한다."""
+
+    if not isinstance(filter_info, dict):
+        raise ValueError(
+            "필터 데이터는 객체 형식이어야 합니다."
+        )
+
+    normalized = {}
+
+    for key, value in filter_info.items():
+
+        if not isinstance(key, str):
+            raise ValueError(
+                "필터 키는 문자열이어야 합니다."
+            )
+
+        key_normalized = key.strip().lower()
+
+        if key_normalized in ("cross", "+"):
+            standard_key = "cross"
+
+        elif key_normalized == "x":
+            standard_key = "x"
+
+        else:
+            raise ValueError(
+                f"지원하지 않는 필터 키입니다: {key}"
+            )
+
+        if standard_key in normalized:
+            raise ValueError(
+                f"중복된 필터 키가 있습니다: {standard_key}"
+            )
+
+        normalized[standard_key] = value
+
+    return normalized
+
+
 # --------------------------------------------------
 # 4. 성능 측정
 # --------------------------------------------------
@@ -210,6 +250,8 @@ def print_user_performance(filter_matrix):
 
 
 def print_json_performance(filters):
+    """필터 키를 정규화한 뒤 크기별 성능을 측정한다."""
+
     print("\n=== 크기별 성능 분석 ===")
 
     for size in (3, 5, 13, 25):
@@ -227,9 +269,18 @@ def print_json_performance(filters):
                 )
                 continue
 
-            sample_filter = size_data.get("cross")
-
             try:
+                normalized_filters = normalize_filter_keys(
+                    size_data
+                )
+
+                sample_filter = normalized_filters.get("cross")
+
+                if sample_filter is None:
+                    raise ValueError(
+                        "Cross 필터 데이터가 없습니다."
+                    )
+
                 validate_matrix(
                     sample_filter,
                     f"{size}x{size} 성능 측정 필터"
@@ -389,6 +440,21 @@ def json_mode():
                     f"size_{size} 필터 데이터가 없습니다."
                 )
 
+            # 필터 키 정규화
+            normalized_filters = normalize_filter_keys(
+                filter_info
+            )
+
+            if "cross" not in normalized_filters:
+                raise ValueError(
+                    "Cross 필터 데이터가 없습니다."
+                )
+
+            if "x" not in normalized_filters:
+                raise ValueError(
+                    "X 필터 데이터가 없습니다."
+                )
+
             # 입력 패턴 가져오기
             input_data = pattern_info.get("input")
 
@@ -402,9 +468,9 @@ def json_mode():
                     "입력 패턴 크기가 패턴 ID와 다릅니다."
                 )
 
-            # Cross 필터와 X 필터 가져오기
-            cross_filter = filter_info.get("cross")
-            x_filter = filter_info.get("x")
+            # 정규화된 키로 필터 가져오기
+            cross_filter = normalized_filters["cross"]
+            x_filter = normalized_filters["x"]
 
             cross_size = validate_matrix(
                 cross_filter,
